@@ -5,5 +5,5 @@ The `notes.md` file contains all annotations divided by chapter.
 
 Example yaml files are under the directory `examples`, with a subdirectory per book Chapter
 
-# Utilities
+# Docker Image
 A `Dockerfile` files is provided. It offers an already setup image for connecting to gcloud with bash completion and some utilities like `kubectx`.
