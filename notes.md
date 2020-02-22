@@ -142,4 +142,89 @@ Every time a node is added it's a good practice to attach labels to it to catego
 
 ## Chapter 4: Replication and other Controllers
 
+### Liveness Probe Basics
+
+Used to check from outside the application that this is still alive. Kubernetes can use three mechanisms:
+* HTTP GET, checking status code (alive if 2xx or 3xx)
+* TCP socket, checking if a connection can be established
+* Exec probe, executing a command inside the container and checking it's return code (alive only if 0)
+
+If a container is restarted, logs from before the restart can be retrieved via `kubectl logs kubia-liveness --previous`. 
+
+To get the reason why a pod had to be restarted `kubectl describe pod kubia-liveness` can be used
+
+**Important**!!: configure `initialDelaySeconds` to give enough time to the application to startup.
+ 
+For detailed configuration options, execute `kubectl explain pod.spec.containers.livenessProbe`
+
+### Liveness Probe Tips
+
+Don't depend on external services.
+
+Keep it light
+
+Don't implement retry on the endpoint (configure it on the livenesProbe instead)
+
+### Extra Notes about Pods vs RCs
+Pods are handled by Kubelet, who lives in the same node. If an entire node crashes, Kubernetes won't reschedule it's pods in a different node. ReplicationController
+ and similar mechanisms solve this issue.
+ 
+### ReplicationController anatomy
+RCs consist of three essential parts:
+* label selector, to check current number
+* replica count, specifying desired number
+* pod template, used for creating new pods
+
+Important to understand that changes on RCs, other than `replica count`, don't affect existing pods. Pods that fall out of the filter aren't managed anymore and `pod template
+` is only used for creating new ones.
+
+Tip: if the selector isn't defined, Kubernetes will extract it from the pod template (keeping yaml smaller)
+ 
+Pods can be moved to another RC or even remove from all by changing labels. `metadata.ownerReferences` refers to the RC that created it.
+ 
+
+### Edit resources
+
+`kubectl edit rc kubia`
+
+`kubectl edit po kubia-9zn4w`
+
+### Deleting RC
+
+By default RCs delete managed pods. It can be avoided with the flag `--cascade=false`.
+
+### ReplicaSet 
+
+Should be used instead of RCs. They offer the same but with more options to select (multiple values for same key, key presence regardless of the value, etc)
+
+
+### DaemonSet
+
+Run one single pod per node. It can use `nodeSelector` to filter which nodes are targeted.
+
+
+### Job
+Executes only once and finishes (unlike RC or RS). If the node fails they will be rescheduled. If the task fails it depends on the `restartPolicy` (`OnFailure` or `Never
+`, always isn't allowed as this is what prevents the Job to be restarted).
+
+`completions` controlls the number of runs, `parallelism` controlls the number of executions in parallel. 
+
+`activeDeadlineSeconds` controls maximum time for the pod before being killed. `backoffLimit` controls the how many times the job can be retried.
+
+`kubectl scale job multi-completion-batch-job --replicas=3` to change parallelism
+
+
+### CronJob
+ 
+ CronJob just creates Jobs at **approximately** the scheduled time. The max deadline can be controlled via `startingDeadlineSeconds`, if exceeded the Job will be marked as failed.
+ 
+ **Important:** In some cases it's possible that cronjobs run twice or not at all. Therefore Jobs scheduled via CronJob should be idempotent and should perform any work that
+  should have been performed by previous runs in case those missed.
+  
+  
+  
+ 
+ 
+
+
 
