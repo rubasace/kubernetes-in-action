@@ -114,6 +114,18 @@ hit external ip using curl: `curl ${externalip}:8080`
 
 Annotations can be retrieved via `kubectl get -o yaml` or via `kubectl describe`
 
+### Delete Resources
+`kubectl delete po kubia-gpu`
+
+`kubectl delete po kubia-gpu kubia-manual`
+
+`kubectl delete po -l creation_method=manual` 
+
+`kubectl delete po --all` all pods in active namespace
+
+`kubectl delete ns custom-namespace` 
+
+`kubectl delete all --all` almost all resources in active namespace (some like secrets don't get deleted)
 
 ### Namespaces
 
@@ -127,3 +139,7 @@ Annotations can be retrieved via `kubectl get -o yaml` or via `kubectl describe`
 
 ### Final Notes
 Every time a node is added it's a good practice to attach labels to it to categorize it. See `nodeSelectors` from `kubia-cpu.yaml`
+
+## Chapter 4: Replication and other Controllers
+
+
