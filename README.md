@@ -1,5 +1,5 @@
 # What's this
-This repo containes my own notes on the book _Kubernetes in Action_ by Marko Luksa
+This repo contains my own notes on the book _Kubernetes in Action_ by Marko Luksa
 
 The `notes.md` file contains all annotations divided by chapter.
 
