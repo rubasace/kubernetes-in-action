@@ -43,6 +43,10 @@ FOE && \
 source ~/.bashrc
 ```
 
+### Change text editor for kubectl edit
+
+`export KUBE_EDITOR="/bin/nano"`
+
 ## Chapter 2: First Steps
 ### Create a ReplicationController (RC)
 
@@ -222,7 +226,7 @@ Executes only once and finishes (unlike RC or RS). If the node fails they will b
   should have been performed by previous runs in case those missed.
   
   
-  
+ 
  
  
 
