@@ -1,7 +1,7 @@
 FROM google/cloud-sdk:latest
 
 #Dependencies
-RUN apt-get install -y nano wget pkg-config bash-completion
+RUN apt-get install -y vim nano watch pkg-config bash-completion
 
 #Kubectl autocompletion
 RUN echo 'source /usr/share/bash-completion/bash_completion' >> ~/.bashrc && \
@@ -17,5 +17,7 @@ RUN git clone https://github.com/ahmetb/kubectx.git ~/.kubectx && \
     ln -sf ~/.kubectx/completion/kubens.bash $COMPDIR/kubens && \
     ln -sf ~/.kubectx/completion/kubectx.bash $COMPDIR/kubectx && \
     echo "export PATH=~/.kubectx:\$PATH" ~/.bashrc
+
+ENV KUBE_EDITOR="/bin/nano"
 
 CMD bash
