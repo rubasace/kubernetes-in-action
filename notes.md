@@ -226,9 +226,78 @@ Executes only once and finishes (unlike RC or RS). If the node fails they will b
   should have been performed by previous runs in case those missed.
   
   
+ ## Chapter 5: Services
+ 
+ Expose a single accesspoint (ip/DNS) for all pods backing up the service. Very important as pods are ephemeral.
+ 
+ `kubectl expose rc kubia --type=LoadBalancer --name kubia-http` to create via command or via YAML (`kubia-svc.yaml`)
+
+### Execute command inside pods
+`kubectl exec kubia-7b4lc -- curl -s http://10.16.12.61` The double dash(`--`) signals the end of the command options, so the rest is executed inside the pod. 
+
+`kubectl exec kubia-7b4lc -it sh` Parameters `-it` can be passed if STDIN needs to be passed to the container (`-i`) and we want to interact with the terminal (`-t`). 
+
+### Session Affinity
+
+`sessionAffinity: ClientIP` can be used to redirect the client always to the same pod. Only `ClientIp` and `None` are valid values.
+
+### Multiple Ports
+
+A single service can expose multiple podd, but each port has to have a name
+
+### Using Named Ports
+
+Services can refer in `targetPort` the name of the port from the Pod definition, instead of hardcoded numbers. `kubia-svc-namedports.yaml` shows this (make sure to delete the
+ old pods after applying, so the new ones have the named ports). This is a good practice so pod port numbers can be changed later, without needing to change the service at all
+ . Even different versions of the pod can be used with different port numbers
+ 
+ ### Discovering services
+ 
+ Pods created after service can see all services ips from envars: `exec kubia-rbx69 env`
+ 
+ All pods are connected to `kube-dns` and can resolve ip via fully qualified domain name (FQDN).  (`http://kubia.default.svc.cluster.local:443` will call the `kubia` service
+  IP on port 443).  The namespace and `svc.cluster.local` can be omitted from the same namespace and cluster (check `/etc/resolv.conf` inside the container for more info)
+  
+ The usage of this internal DNS can be controlled via `dnsPolicy` on each Pod spec.
+ 
+ ### Ping doesn't work
+ 
+ Services are just virtual IPs that only work in combination with the service ports. So pinging to test if a service is working won't work, though curl works.
+
+### Connecting to services outside the cluster
+
+ Services can be created without a selector. If so, Kubernetes won't create the Endpoint resource associated to it. We can create it manually specifying the addresses and ports
+  (check `external-svc.yaml`). It's important that both **Service and Endpoints have the same name**.
+  
+ An alternative is creating a service with type `ExternalName`, that exposes an external service via it's FQDN (check `externalname-svc.yaml`).
+ 
+ ExternalName services don't get a cluster IP as they are just CNAME DNS records. 
  
  
+ ### Exposing services to external clients
+
+Can be done in three ways:
+* Service with type `NodePort`: a port open on each cluster node
+* Service with type `LoadBalancer`: dedicated loadbalancer with an IP provided by the cloud infrastructure (won't work on-premise)
+* Creating an Ingress resource: It allows to expose multiple services on a single IP address. Also operates at L7 (HTTP) so can offer more features than L4.
+
+
+### Filter fields with -o jsonpath
+`kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="ExternalIP")].address}'`  More documentation in https://kubernetes.io/docs/reference/kubectl/jsonpath/
+
  
+ ### NodePort
+ 
+ NodePort opens a specific port on all nodes of the cluster. By adding a firewall rule (on GCP), we can access the service via any of the nodes IP and the specified port.
+ 
+ ### LoadBalancer
+ 
+ It's important to understand that LoadBalancers are just NodePort services with and additional load-balancer infrastructure. Therefore, by describing the LoadBalancer we can see
+  that a random NodePort has been assigned. If we open that port on the firewall, we can access the service via any NodeIP, in the same way as the NodePort resource. This is
+   definitely not needed, as the cloud provider will assign an external IP to the loadBalancer, abstracting clients from specific node IPs (nodes can fail, we might want to
+    balance traffic across multiple nodes, etc)
+  
+### Session Affinity on web browsers and LoadBalancer
 
-
-
+Even when session affinity is set to `None`, browsers use `keep-alive` connection and send all requests through the same connection. This means that after the connection is
+ first opened, a random pod is selected. From then on, until the connection gets closed, all network communication is done with the same pod.
