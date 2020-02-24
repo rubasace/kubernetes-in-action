@@ -301,3 +301,53 @@ Can be done in three ways:
 
 Even when session affinity is set to `None`, browsers use `keep-alive` connection and send all requests through the same connection. This means that after the connection is
  first opened, a random pod is selected. From then on, until the connection gets closed, all network communication is done with the same pod.
+
+### Peculiarities of external connections
+
+Connections through a NodePort (including via a LoadBalancer) choose randomly a pod. This might cause the traffic to be redirected to another's node pod, adding an extra network
+ jump. This can be avoided setting `externalTrafficPolicy: Local` on the service spec. Connection will hang if there's no pod on the node. This also affects load balancing
+  (traffic evenly distributed across nodes, but not across pods)
+  
+### Ingress
+
+LoadBalancers require one public IP per service.
+
+Ingress requires one ingress controller (and only one public IP that can expose multiple services)
+
+On cloud providers, ingress controllers need to point to a NodePort (required by cloud providers, not Kubernetes)
+
+### Ingress + cloud providers
+Ingress requires to point to a NodePort on cloud providers
+
+### ReadinessProbe
+
+Similar to LivenessProbe, it indicates Kubernetes when a por is ready to receive traffic (so services don't start sending traffic to pods that are still starting up)
+
+Kubernetes can use three mechanisms:
+* HTTP GET, checking status code (alive if 2xx or 3xx)
+* TCP socket, checking if a connection can be established
+* Exec probe, executing a command inside the container and checking it's return code (alive only if 0)
+
+It acts like another label for the service (pods can move from non-ready to ready and vice-versa). But it doesn't affect the pod numbers!! A ReplicaSet for 3 instances will
+ always have 3 instances matching the selector, it doesn't matter if they are ready or not.
+ 
+ **Always define a readinessProbe** 
+ 
+ ### Add/Remove pods from service manually
+ It's recommendable to add a label `enabled=true` or `serving=true` or something along those lines, both to the pods (RC/RS template) and to the service selector. That way we
+  can modify the label to pull off a pod from a service (or put it back in). Priceless for some situations where we need to debug what's going on in production.
+  
+ ### Exposing every pods IP
+  
+  We can expose every pods IP under a single service, making it headless (`clusterIP: None`). Have a look at `kubia-svc-headless.yaml`. By default it will only show ready pods
+  , this can be changed via `publishNotReadyAddresses` field in the service spec.
+  
+### TroubleShooting services
+1. Make sure to connect from inside the cluster
+2. Don't even try ping (virtual IP, won't work)
+3. Check readiness probe of pods
+4. Check if a pod is part of a service by checking the Endpoint with `kubectl get endpoints` (`ENDPOINTS` field should show all pod IPs) 
+5. If FQDN doesn't work try to connect using its cluster IP instead
+6. Check you are connecting through exposed port, not target port
+7. Make sure the app is not only binding to localhost
+
