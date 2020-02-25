@@ -351,3 +351,76 @@ It acts like another label for the service (pods can move from non-ready to read
 6. Check you are connecting through exposed port, not target port
 7. Make sure the app is not only binding to localhost
 
+## Chapter 6: Volumes
+Volumes are pod components, like containers. 
+
+They share its lifeycle (persiste accross restarts, but get deleted along with the pod). 
+
+They are available to all containers in a pod, but need to be mounted at a container level, individually, to its filesystem.
+
+### Several volume types
+* emptyDir: empty directory for transient data
+* hostPath: to mount directories from the node's filesystem
+* gitRepo: directory with git repo content
+* nfs
+* ConfigMap, Secret
+* Many others...
+
+### EmptyDir
+Starts up empty and data is lost when pod gets deleted.
+
+Useful for sharing data between containers. 
+
+Also useful as temporary storage for the container (might be only option if container fs isn't writable).
+
+### GitRepo
+Checks out repository at creation. Won't sync.
+
+If you need to sync you'll need a sidecar container doing the job (check `fortune-pod-gitsync.yaml`)
+
+### HostPath
+Mounts a file or directory from the node fs to the containers one. 
+
+Properly persistent (will persiste data even after the pod gets deleted)
+
+Should not be used for persistence on multi-node, data stored in a particula node. Therefore, if pod gets scheduled to a different node, it won't have access to the same data
+. NFS, vendor specific like GCE volumes, etc are way better options.
+
+Used widely by GKE (and probably others) to read node information (not to store data), as for example fluentd (accessing `/var/log`, `/var/lib/docker/containers` and `/var/run/google-fluentd`).
+
+### GCE persistent disk
+
+`gcloud compute disks create --size=1GiB --zone=europe-west2-c mongodb` (ignore warning on size)
+
+### PersistentVolumes and PersistentVolumeClaims
+
+Defining volumes inside a pod goes against Kubernetes (knowing the NFS server address, setting up the persistent disk, etc)
+
+Two well separated resources:
+
+* PersistentVolume: administrators setup the storage and register it by creating PersistentVolume (including size and accessModes)
+* PersistentVolumeClaim: defines storage requirements and access mode. The PersistentVolumeClaim gets then added as a volume to the pod.
+
+PersistentVolumeClaims are separate resources from Pods, so the volume claim can stay available even if the pod is deleted.
+
+### Dynamic provisioning of PersistentVolumes
+Instead of provisioning PersistentVolumes directly, we can define StorageClass that will use provisioners to dynamically provide PersistentVolumes.
+
+Done through `spec.provisioner` that will receive `parameters`.
+
+PersistentVolumeClaims can refer to the `storageClass` by name
+
+StorageClass allows to provide different kinds of storage by name, without exposing the internals of what is being provided
+
+When we define `storageClassName: ""` we are indicating the PersistentVolumeClaim that we want to use a pre-provisioned PV, instead of a dynamically provisioned one
+
+The best way of attaching storage to a pod is using a PersistentVolumeClaim and a Pod mounting it. PVC will get a StorageClass by default, but can be customized). That way the
+ dynamic volume provisioner will take care of everything else.
+ 
+ 
+
+
+
+
+
+
