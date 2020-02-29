@@ -546,4 +546,54 @@ Used to authenticate against private docker registries when pulling images.
 Can be used from `pod.spec.imagePullSecrets` or as part of the ServiceAccount, so doesn't need to go into each pod definition.
 
 
+## Chapter 8: accessing pod metadata and other resources
+
+### Downward API
+
+Kubernetes can pass some information down to containers:
+* Pod name
+* Pod ip address
+* namespace
+* node name
+* service account name
+* CPU/memory request
+* CPU/memory limit
+* pod labels
+* pod annotations
+
+Can be passed as volumes or as envars (labels and annotations cannot be passed as envars, cause they can change and there aren't mechanisms for updating envars).
+
+When passed as volumes, for `resourceFieldRef`,  the container needs to be specified (even if there's only one)
+
+Accessible via `fieldRef` and `resourceFieldRef`. Resources can specify the divisor (1 or 1m, for CPU or 1, 1k, 1Ki, 1M, 1Mi... for memory)
+
+### API Server
+
+can be called locally executing `kubectl proxy` and connecting through it (takes care of validating certificate and authentication)
+
+can call from inside the pod using injected secrets (token and certificate):
+
+```bash
+curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer $TOKEN" https://kubernetes
+```
+If RBAC (Role Based Access Control) is enabled, it might give error in authentication 
+
+Three files are injected in `/var/run/secrets/kubernetes.io/serviceaccount/`, all required for communication:
+* app needs to verify API server certificate (using `ca.crt` file )
+* app authenticates sending `Authorization` header  (using `token` file)
+* request resources for a namespace, can know on which one it using `namespace` file
+
+### API Server through Ambassador
+
+Instead of pod dealing with all https and validation, can connect using plain HTTP through a container that takes care of everything (ambassador pattern) (check `curl-with
+-ambassador.yaml`)
+
+Then it can be called from inside the pod using localhost, as all containers in the same Pod share the same network interface: curl localhost:8001
+
+
+### API Clients
+
+If we need to do complex stuff with Kubernetes API we can use specific libraries such as Golan client or Python client.
+
+There are plenty of other non-oficial libraries (Java, Node, PHP, Ruby...)
 
