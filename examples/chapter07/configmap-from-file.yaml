@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-from-file
+data:
+  config-file.conf: |
+    data1=hello
+    data2=bye

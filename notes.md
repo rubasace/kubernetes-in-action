@@ -418,9 +418,132 @@ The best way of attaching storage to a pod is using a PersistentVolumeClaim and 
  dynamic volume provisioner will take care of everything else.
  
  
+## Chapter 7: ConfigMaps and Secrets
+
+We can configure apps in three ways:
+* Passing command-line argumments
+* Setting envars
+* Mounting files
+
+### ENTRYPOINT and CMD
+* ENTRYPOINT defines the executable invoked when container is started
+* CMD specifies arguments passed to ENTRYPOINT (it can be used also to specify the command instead of the ENTRYPOINT, though less correct)
+
+### shell and exec forms
+
+* shell (`node app.js`) 
+* exec  (`["node", "app.js"]`)
+
+exec ENTRYPOINT runs the process directly (not inside a shell), while shell runs it as a child process of the shell. As the shell process isn't necessary, exec form is better
+ for ENTRYPOINT.
+ 
+ 
+### Container ENTRYPOINT and CMD
+
+`container.command` = ENTRYPOINT
+
+`container.args` = CMD
+
+### CongfigMaps
+Separate configuration from pod (different configurations on different environments, with same pod definition)
+
+from literal: `kubectl create configmap fortune-config --from-literal=sleep-interval=25`
+
+from multiple literals: `kubectl create configmap fortune-config --from-literal=sleep-interval=25 --from-literal=another=hello`
+
+from content of a file: `kubectl create configmap config-from-file --from-file=config-file.conf`
+
+by default key of the data entry will be name of the file, can be changed providing the name of the key (`newkey` in the example): `kubectl create configmap config-from-file --from-file=newkey=config-file.conf`
+
+from directory: `kubectl create configmap config-from-file --from-file=directoryName` (will create one entry per file in the directory)
+
+**All options can be combined in any way**
+
+Can be passed into container in three ways:
+* envar
+* argument (reading envar)
+* volume mount
+
+If Configmap doesn't exist, pod won't startup, unless ConfigMap reference is marked as optional (`configMapKeyRef.optional: true`)
 
 
+#### ConfigMap as envars
+reference with `env.valueFrom` + `key` for single values
 
+reference with `envFrom` + `configMapRef` for all envars (setting `PREFIX` if you want specific prefix)
+
+**Only valid DNS names** will be accepted as envars. `-` isn't a valid character, so envars containing it will be ignored.
+
+#### ConfigMap as args
+Same as envars, and then refering envar on the `args`
+
+**IMPORTANT:** variables are referred with parentesis (`$(ENVAR_NAME)`), not with curly brackets (`${ENVAR_NAME}`).
+
+#### ConfigMap as volume
+More useful when we want to provide lots of parameters, configuration files, etc.
+
+Mount using `configMap` on the volume definition.
+
+Can specify which items to mount using `items`
+
+**IMPORTANT:** mounting volumes hide existing files (Linux mounting on non-empty directory)
+
+####ConfigMap as files (not overriding directory)
+
+We can use `subPath` on the volumeMount to mount a file inside an existing directory (see `fortune-pod-configmap-volume-subpath.yaml`)
+
+#### Changing default permission
+
+We can use `defaultMode` on the volume definition to change default permission of files (see `fortune-pod-configmap-volume-defaultmode.yaml`)
+
+
+#### Updating ConfigMap
+
+Updating the ConfigMap updates the mounted volume to reflect the changes (up to the container to reload it or not)
+
+It still takes a lot of time to refresh (v1.14.10)
+
+Files are updated atomically!! files are symlinks pointing to a `..data` folder. Data folder is also a symlink pointing to another dir. When the mount changes, a new
+ dir is
+ created and then `..data` points to it, changing all files at the same time.
+ 
+ ```bash
+# kubectl exec -it fortune-configmap-volume -c web-server -- ls -lA /etc/nginx/conf.d
+ drwxr-xr-x    2 root     root          4096 Feb 29 12:42 ..2020_02_29_12_42_06.288600198
+ lrwxrwxrwx    1 root     root            31 Feb 29 12:42 ..data -> ..2020_02_29_12_42_06.288600198
+ lrwxrwxrwx    1 root     root            27 Feb 29 12:35 my-nginx-config.conf -> ..data/my-nginx-config.conf
+ lrwxrwxrwx    1 root     root            21 Feb 29 12:35 sleep-interval -> ..data/sleep-interval
+
+```
+
+**IMPORTANT:** files mounted individually don't get updated when ConfigMap changes, only directories (checked with v1.14.10)
+
+Updating a configMap can cause different pods to behave differently for a period of time, as new created ones will have the latest values while previous instances will take some
+ time to update.
+ 
+If the app doesn't reload configuration automatically, then it's a bad idea to modify and existing ConfigMap
+
+### Secrets
+
+
+Similar to ConfigMap but Kubernetes keeps them safe: always stored in memory, only passed to nodes that need them and stored encrypted.
+
+Can be used as ConfigMap:
+* envars (not recommended, as many apps expose envars somehow) using `env.valueFrom.secreatKeyRef`
+* as files in volumes (uses tmpfs, so never get written to disk) using `volume.secret.secretName`
+
+Should be used when storing sensitive data
+
+Data is encoded, not encrypted! (`get -o yaml` or `describe`)
+
+Can contain text or binary, but up to 1MB
+
+Can use `stringData` to add non-binary data (write-only, it will then appear under `data`)
+
+### Docker Registry Secret
+
+Used to authenticate against private docker registries when pulling images. 
+Can be used from `pod.spec.imagePullSecrets` or as part of the ServiceAccount, so doesn't need to go into each pod definition.
 
 
 
