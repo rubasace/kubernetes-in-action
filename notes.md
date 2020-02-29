@@ -597,3 +597,115 @@ If we need to do complex stuff with Kubernetes API we can use specific libraries
 
 There are plenty of other non-oficial libraries (Java, Node, PHP, Ruby...)
 
+## Chapter 9: Deployments
+
+Three options:
+* Delete old pods and replace with new ones (adds downtime)
+* Add new pods, switch service to new version and delete old pods (uses more resources due to duplicated pods)
+* Rolling update: progressively sin up new version and delete old one
+
+
+### ImagePullPolicies
+For tag `latest` the default policy is  `Always` which means that it will always try to pull it again
+
+For any other, the default policy is `IfNotPresent`. 
+
+That means that, if we override in docker any tag that isn't `latest`, the new image won't be downloaded if it already existed.
+
+
+### Rolling Update using kubectl rolling-update
+
+```
+kubectl rolling-update kubia-v1 kubia-v2 --image=luksa/kubia:v2
+```
+Copies RC kubia-v1 and changes image to the new one specified.
+
+Adds extra `deployment` label to template and selector of new RC
+
+Also adds different `deployment` label to selector of old RC and old pods
+
+Kubernetes handles both RCs desired numbers to slowly scale up new one while scaling down the old one
+
+Service doesn't change so it matches both old and new pods, so traffic gets progressively switched to more pods of the new version till finnally that's the only one serving traffic
+
+It's deprecated!
+
+Main problems:
+* modifies your objects (labels on pods and selectors on RCs)
+* it operates on the client (network problems can cause serious issues)
+* it's imperative (we ask about the action, we don't define the state we would like to achieve)
+
+
+### Deployment
+
+A Deployment is higher level than RS or RC.
+
+Operates declaratively, and creates a RS underneath (RS manages pods, not Deployment).
+
+It takes care of the process `kubectl rolling-update` takes care of (Kubernetes control plane does, but that's the idea)
+
+**IMPORTANT** Use `--record` when applying deployments, to record it in the revision history
+
+Deployment creates multiple RS (one per version)
+
+Unlike with kubectl, the old RS is still there (with 0 derired)
+
+### Rollback deployment
+
+deployments can be rollbacked using `kubectl rollout undo deployment kubia`. Can it be done even during the rollout process
+
+we can return to an old revision using `kubectl rollout undo deployment kubia --to-revision=1` (it can rescale old RCs that are not at 0)
+
+
+### Configure rollingUpdate
+
+`deployment.spec.strategy.rollingUpdate.maxSurge`: how many pods can be above the desired replica count
+`deployment.spec.strategy.rollingUpdate.maxUnavailable`: how many pods can be unavailable in relation to the desired replica count (still not ready)
+
+desired 3, maxSurge 3 and maxUnavailable 1 means that maximum 4 pods can exist at any moment, and at least 2 need to be available (max 1 of the 3 desired plus the 1 that surges)
+
+They accept absolute values or percentages (relation to desired replicas)
+
+### Get rollout history
+
+```bash
+kubectl rollout history deployment kubia
+```
+
+### Pause rollout process
+
+```bash
+kubectl rollout pause deployment kubia
+```
+
+Useful for performing canary releases (very basic)
+
+It also prevents further updates to the deployment until it's resumed
+
+### Resume rollout process
+
+```bash
+kubectl rollout resume deployment kubia
+```
+
+### MinReadySeconds to block rollouts of bad versions
+
+By setting `minReadySeconds` we tell the deployment that the pod needs to be ready for that amount of time, preventing it to continue the process till then. 
+
+With a good readinessProbe and a proper waiting time we can make Kubernetes get stuck on the deployment of versions that otherwise might affect the client.
+
+This rollout can then be aborted using `rollout undo`. Future versions of Deployment have `progressDeadlineSeconds` that will abort automatically.
+
+### Modify Resources
+
+There are multiple ways:
+
+* `kubectl edit`: open manifest in editor and updates on exit
+* `kubectl patch`: modifies properties of object (specified with `-p`)
+* `kubectl apply`: modifies object from full json/yaml (creates if doesn't exist)
+* `kubectl replace`: like apply but fails if the object doesn't exist
+* `kubectl set image`: changes container image in pod, RC, Deployment, DS, Job or RS
+
+
+
+
